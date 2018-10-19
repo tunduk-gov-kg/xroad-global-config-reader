@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>kg.gov.tunduk</groupId>
+  <artifactId>xroad-global-conf-reader</artifactId>
+  <versioning>
+    <versions>
+      <version>1.0-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20181019093226</lastUpdated>
+  </versioning>
+</metadata>
