@@ -5,6 +5,7 @@ import kg.gov.tunduk.xroad.service_metadata_protocol.model.ClientList;
 import kg.gov.tunduk.xroad.soap.XRoadClientId;
 import kg.gov.tunduk.xroad.soap.XRoadServiceId;
 
+import java.io.IOException;
 import java.net.URL;
 
 public interface ServiceMetadataManager {
@@ -19,5 +20,5 @@ public interface ServiceMetadataManager {
 
     XRoadServiceId[] listMethods(XRoadClientId clientId);
 
-    String getWsdl(XRoadServiceId serviceId);
+    String getWsdl(XRoadServiceId serviceId) throws IOException;
 }

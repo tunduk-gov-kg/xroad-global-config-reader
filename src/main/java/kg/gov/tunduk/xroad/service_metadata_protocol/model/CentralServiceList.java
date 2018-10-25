@@ -1,6 +1,6 @@
 package kg.gov.tunduk.xroad.service_metadata_protocol.model;
 
-import kg.gov.tunduk.xroad.soap.CentralServiceId;
+import kg.gov.tunduk.xroad.soap.XRoadCentralServiceId;
 import lombok.Data;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -14,5 +14,5 @@ import javax.xml.bind.annotation.XmlRootElement;
 public class CentralServiceList {
 
     @XmlElement(name = "centralService", namespace = "http://x-road.eu/xsd/xroad.xsd")
-    private CentralServiceId[] serviceIds;
+    private XRoadCentralServiceId[] serviceIds;
 }

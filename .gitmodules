@@ -1,0 +1,3 @@
+[submodule "xroad-spring"]
+	path = xroad-spring
+	url = https://github.com/tunduk-gov-kg/xroad-spring.git

@@ -1,23 +1,26 @@
 package kg.gov.tunduk.xroad.service_metadata_protocol;
 
+import kg.gov.tunduk.xroad.XRoadClientInterceptor;
 import kg.gov.tunduk.xroad.XRoadHeader;
 import kg.gov.tunduk.xroad.service_metadata_protocol.model.*;
-import kg.gov.tunduk.xroad.soap.CentralServiceId;
+import kg.gov.tunduk.xroad.soap.XRoadCentralServiceId;
 import kg.gov.tunduk.xroad.soap.XRoadClientId;
 import kg.gov.tunduk.xroad.soap.XRoadServiceId;
 import lombok.val;
+import org.apache.commons.io.IOUtils;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.ws.client.core.support.WebServiceGatewaySupport;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+import org.springframework.ws.client.support.interceptor.ClientInterceptor;
+import org.springframework.ws.mime.Attachment;
 
-import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Iterator;
 import java.util.UUID;
 
 public class DefaultServiceMetadataManager extends WebServiceGatewaySupport implements ServiceMetadataManager {
@@ -28,23 +31,12 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
 
     private final Unmarshaller unmarshaller;
 
-    {
+    public DefaultServiceMetadataManager() throws JAXBException {
         Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
-        marshaller.setClassesToBeBound(
-                ListMethodsRequest.class,
-                ListMethodsResponse.class,
-                XRoadServiceId.class
-        );
+        marshaller.setPackagesToScan("kg.gov.tunduk.xroad.service_metadata_protocol.model");
         this.setUnmarshaller(marshaller);
         this.setMarshaller(marshaller);
-    }
-
-    public DefaultServiceMetadataManager() throws JAXBException {
-        JAXBContext jaxbContext = JAXBContext.newInstance(
-                Client.class, XRoadClientId.class, ClientList.class,
-                CentralServiceList.class, CentralServiceId.class
-        );
-        unmarshaller = jaxbContext.createUnmarshaller();
+        this.unmarshaller = marshaller.getJaxbContext().createUnmarshaller();
     }
 
     private InputStream getHttpContent(URL url) throws IOException {
@@ -101,7 +93,7 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
         } catch (Exception ex) {
             ex.printStackTrace();
             CentralServiceList emptyList = new CentralServiceList();
-            emptyList.setServiceIds(new CentralServiceId[0]);
+            emptyList.setServiceIds(new XRoadCentralServiceId[0]);
             return emptyList;
         }
     }
@@ -131,7 +123,38 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
     }
 
     @Override
-    public String getWsdl(XRoadServiceId serviceId) {
-        throw new NotImplementedException();
+    public String getWsdl(XRoadServiceId serviceId) throws IOException {
+        val messageId = UUID.randomUUID().toString();
+        val userId = "DefaultServiceMetadataManager";
+
+        val getWsdlService = new XRoadServiceId();
+        getWsdlService.setInstance(serviceId.getInstance());
+        getWsdlService.setMemberClass(serviceId.getMemberClass());
+        getWsdlService.setMemberCode(serviceId.getMemberCode());
+        getWsdlService.setSubSystemCode(serviceId.getSubSystemCode());
+        getWsdlService.setServiceCode("getWsdl");
+        getWsdlService.setServiceVersion("v1");
+
+        GetWsdlRequest getWsdlRequest = new GetWsdlRequest();
+        getWsdlRequest.setServiceCode(serviceId.getServiceCode());
+        getWsdlRequest.setServiceVersion(serviceId.getServiceVersion());
+
+        try {
+            XRoadClientInterceptor attachmentInterceptor = new XRoadClientInterceptor();
+            setInterceptors(new ClientInterceptor[]{attachmentInterceptor});
+            getWebServiceTemplate().marshalSendAndReceive(
+                    getSecurityServerUrl().toString(), getWsdlRequest,
+                    new XRoadHeader(getCurrentClientId(), getWsdlService, messageId, userId));
+            Iterator<Attachment> attachments = attachmentInterceptor.getAttachments();
+            InputStream inputStream = attachments.next().getInputStream();
+
+            StringWriter writer = new StringWriter();
+            IOUtils.copy(inputStream, writer, "UTF-8");
+            return writer.toString();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw ex;
+        }
     }
+
 }
