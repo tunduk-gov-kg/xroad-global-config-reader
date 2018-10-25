@@ -15,4 +15,7 @@ public class Client {
 
     @XmlElement(name = "id", namespace = "http://x-road.eu/xsd/xroad.xsd")
     private XRoadClientId id;
+
+    @XmlElement(name = "name", namespace = "http://x-road.eu/xsd/xroad.xsd")
+    private String name;
 }
