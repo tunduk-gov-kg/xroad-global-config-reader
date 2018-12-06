@@ -3,12 +3,12 @@ package kg.gov.tunduk.xroad.service_metadata_protocol;
 import kg.gov.tunduk.xroad.XRoadClientInterceptor;
 import kg.gov.tunduk.xroad.XRoadHeader;
 import kg.gov.tunduk.xroad.service_metadata_protocol.model.*;
-import kg.gov.tunduk.xroad.soap.XRoadCentralServiceId;
 import kg.gov.tunduk.xroad.soap.XRoadClientId;
 import kg.gov.tunduk.xroad.soap.XRoadServiceId;
 import lombok.val;
 import org.apache.commons.io.IOUtils;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
+import org.springframework.util.Assert;
 import org.springframework.ws.client.core.support.WebServiceGatewaySupport;
 import org.springframework.ws.client.support.interceptor.ClientInterceptor;
 import org.springframework.ws.mime.Attachment;
@@ -47,11 +47,13 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
 
     @Override
     public void setCurrentClientId(XRoadClientId clientId) {
+        Assert.isTrue(clientId != null, "clientId cannot be null");
         this.currentClientId = clientId;
     }
 
     @Override
     public void setSecurityServerUrl(URL url) {
+        Assert.isTrue(url != null, "securityServerUrl cannot be null");
         this.securityServerUrl = url;
     }
 
@@ -70,32 +72,17 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
     }
 
     @Override
-    public ClientList listClients() {
-        try {
-            URL url = new URL(getSecurityServerUrl(), "/listClients");
-
-            InputStream inputStream = getHttpContent(url);
-            return (ClientList) unmarshaller.unmarshal(inputStream);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            ClientList emptyList = new ClientList();
-            emptyList.setMembers(new Client[0]);
-            return emptyList;
-        }
+    public ClientList listClients() throws IOException, JAXBException {
+        URL url = new URL(getSecurityServerUrl(), "/listClients");
+        InputStream inputStream = getHttpContent(url);
+        return (ClientList) unmarshaller.unmarshal(inputStream);
     }
 
     @Override
-    public CentralServiceList listCentralServices() {
-        try {
-            URL url = new URL(getSecurityServerUrl(), "/listCentralServices");
-            InputStream inputStream = getHttpContent(url);
-            return (CentralServiceList) unmarshaller.unmarshal(inputStream);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            CentralServiceList emptyList = new CentralServiceList();
-            emptyList.setServiceIds(new XRoadCentralServiceId[0]);
-            return emptyList;
-        }
+    public CentralServiceList listCentralServices() throws IOException, JAXBException {
+        URL url = new URL(getSecurityServerUrl(), "/listCentralServices");
+        InputStream inputStream = getHttpContent(url);
+        return (CentralServiceList) unmarshaller.unmarshal(inputStream);
     }
 
     @Override
@@ -110,22 +97,21 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
         listMethodsService.setSubSystemCode(clientId.getSubSystemCode());
         listMethodsService.setServiceCode("listMethods");
 
-        try {
-            val response = (ListMethodsResponse) getWebServiceTemplate()
-                    .marshalSendAndReceive(getSecurityServerUrl().toString(), new ListMethodsRequest(),
-                            new XRoadHeader(getCurrentClientId(), listMethodsService, messageId, userId));
+        /*
+         * Handle soap fault
+         * */
+        setInterceptors(new ClientInterceptor[]{new XRoadClientInterceptor()});
 
-            return response.getServices();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return new XRoadServiceId[0];
-        }
+        val response = (ListMethodsResponse) getWebServiceTemplate()
+                .marshalSendAndReceive(getSecurityServerUrl().toString(), new ListMethodsRequest(),
+                        new XRoadHeader(getCurrentClientId(), listMethodsService, null, messageId, userId));
+        return response.getServices();
     }
 
     @Override
     public String getWsdl(XRoadServiceId serviceId) throws IOException {
         val messageId = UUID.randomUUID().toString();
-        val userId = "DefaultServiceMetadataManager";
+        val userId = "SERVICE_METADATA_MANAGER";
 
         val getWsdlService = new XRoadServiceId();
         getWsdlService.setInstance(serviceId.getInstance());
@@ -139,22 +125,20 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
         getWsdlRequest.setServiceCode(serviceId.getServiceCode());
         getWsdlRequest.setServiceVersion(serviceId.getServiceVersion());
 
-        try {
-            XRoadClientInterceptor attachmentInterceptor = new XRoadClientInterceptor();
-            setInterceptors(new ClientInterceptor[]{attachmentInterceptor});
-            getWebServiceTemplate().marshalSendAndReceive(
-                    getSecurityServerUrl().toString(), getWsdlRequest,
-                    new XRoadHeader(getCurrentClientId(), getWsdlService, messageId, userId));
-            Iterator<Attachment> attachments = attachmentInterceptor.getAttachments();
-            InputStream inputStream = attachments.next().getInputStream();
+        XRoadClientInterceptor attachmentInterceptor = new XRoadClientInterceptor();
+        setInterceptors(new ClientInterceptor[]{attachmentInterceptor});
+        getWebServiceTemplate().marshalSendAndReceive(
+                getSecurityServerUrl().toString(), getWsdlRequest,
+                new XRoadHeader(getCurrentClientId(), getWsdlService, null, messageId, userId));
+        Iterator<Attachment> attachments = attachmentInterceptor.getAttachments();
 
-            StringWriter writer = new StringWriter();
-            IOUtils.copy(inputStream, writer, "UTF-8");
-            return writer.toString();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw ex;
-        }
+        Assert.isTrue(attachments.hasNext(), "no wsdl file found");
+
+        InputStream inputStream = attachments.next().getInputStream();
+
+        StringWriter writer = new StringWriter();
+        IOUtils.copy(inputStream, writer, "UTF-8");
+        return writer.toString();
     }
 
 }

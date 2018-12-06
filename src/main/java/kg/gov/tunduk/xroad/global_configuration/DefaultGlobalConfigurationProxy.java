@@ -14,9 +14,9 @@ import java.net.URL;
 
 public class DefaultGlobalConfigurationProxy implements GlobalConfigurationProxy {
 
-    public SharedParams getSharedParams(String centralServerIpAddress) throws IOException, JAXBException {
-        URL url = new URL(String.format("http://%s/internalconf", centralServerIpAddress));
-        HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
+    public SharedParams getSharedParams(URL centralServerUrl) throws IOException, JAXBException {
+        URL internalConfUrl = new URL(centralServerUrl, "internalconf");
+        HttpURLConnection httpURLConnection = (HttpURLConnection) internalConfUrl.openConnection();
         httpURLConnection.setRequestMethod("GET");
         InputStream connectionInputStream = httpURLConnection.getInputStream();
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connectionInputStream));
@@ -26,7 +26,7 @@ public class DefaultGlobalConfigurationProxy implements GlobalConfigurationProxy
             if (line.contains("shared-params.xml")) {
                 int separatorIndex = line.lastIndexOf(":");
                 String path = line.substring(separatorIndex + 1).trim();
-                sharedParamsUrl = new URL(String.format("http://%s/%s", centralServerIpAddress, path));
+                sharedParamsUrl = new URL(centralServerUrl, path);
             }
         }
         if (sharedParamsUrl == null) {
