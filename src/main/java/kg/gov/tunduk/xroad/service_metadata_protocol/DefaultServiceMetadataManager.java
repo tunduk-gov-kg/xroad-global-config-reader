@@ -2,6 +2,7 @@ package kg.gov.tunduk.xroad.service_metadata_protocol;
 
 import kg.gov.tunduk.xroad.XRoadClientInterceptor;
 import kg.gov.tunduk.xroad.XRoadHeader;
+import kg.gov.tunduk.xroad.global_configuration.model.SharedParams;
 import kg.gov.tunduk.xroad.service_metadata_protocol.model.*;
 import kg.gov.tunduk.xroad.soap.XRoadClientId;
 import kg.gov.tunduk.xroad.soap.XRoadServiceId;
@@ -15,13 +16,15 @@ import org.springframework.ws.mime.Attachment;
 
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.StringWriter;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class DefaultServiceMetadataManager extends WebServiceGatewaySupport implements ServiceMetadataManager {
 
@@ -33,7 +36,10 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
 
     public DefaultServiceMetadataManager() throws JAXBException {
         Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
-        marshaller.setPackagesToScan("kg.gov.tunduk.xroad.service_metadata_protocol.model");
+        marshaller.setPackagesToScan(
+                "kg.gov.tunduk.xroad.service_metadata_protocol.model",
+                "kg.gov.tunduk.xroad.global_configuration.model"
+        );
         this.setUnmarshaller(marshaller);
         this.setMarshaller(marshaller);
         this.unmarshaller = marshaller.getJaxbContext().createUnmarshaller();
@@ -139,6 +145,29 @@ public class DefaultServiceMetadataManager extends WebServiceGatewaySupport impl
         StringWriter writer = new StringWriter();
         IOUtils.copy(inputStream, writer, "UTF-8");
         return writer.toString();
+    }
+
+    @Override
+    public SharedParams verificationConf() throws IOException, JAXBException {
+        URL verificationConf = new URL(getSecurityServerUrl(), "verificationconf");
+        InputStream httpContent = getHttpContent(verificationConf);
+        try (ZipInputStream zipInputStream = new ZipInputStream(httpContent)) {
+            ZipEntry zipEntry;
+            Map<String, byte[]> zipContent = new HashMap<>();
+            while ((zipEntry = zipInputStream.getNextEntry()) != null) {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                for (int c = zipInputStream.read(); c != -1; c = zipInputStream.read()) {
+                    outputStream.write(c);
+                }
+                zipInputStream.closeEntry();
+                zipContent.put(zipEntry.getName(), outputStream.toByteArray());
+                outputStream.close();
+            }
+            byte[] bytes = zipContent.get("verificationconf/instance-identifier");
+            String instanceIdentifier = new String(bytes);
+            byte[] sharedParamsBytes = zipContent.get(String.format("verificationconf/%s/shared-params.xml", instanceIdentifier));
+            return (SharedParams) unmarshaller.unmarshal(new ByteArrayInputStream(sharedParamsBytes));
+        }
     }
 
 }

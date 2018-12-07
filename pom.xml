@@ -6,7 +6,7 @@
 
     <groupId>kg.gov.tunduk</groupId>
     <artifactId>xroad-global-conf-reader</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <packaging>jar</packaging>
 
     <repositories>

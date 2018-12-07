@@ -20,5 +20,4 @@ public class SharedParams {
 
     @XmlElement(name = "member")
     private List<XRoadMember> members;
-
 }
